@@ -8,7 +8,7 @@ import pydeck as pdk
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Nairobi Weather & Flood Watch",
+    page_title="Nairobi Flood Monitoring and Risk Predictor",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -184,45 +184,71 @@ elif app_mode == "Scenario Simulator":
 
 
 # MODE 3: WARD GIS MAP (Self-Contained & Error-Proof)
-
 elif app_mode == "Ward GIS Map":
-    st.subheader("Nairobi Regional Risk Radar & Ward Nodes")
-    st.markdown("Interactive geospatial monitoring grid across Nairobi sub-counties.")
+    st.subheader("Nairobi Ward-Level Dynamic Risk Radar")
+    st.markdown("Interactive spatial risk layers color-coded by model flood probability and river basin proximity.")
 
-    geojson_path = "nairobi_wards.geojson"
+    # 1. Base Ward Data with Elevation & River Basin Risk Multipliers
+    ward_nodes = pd.DataFrame([
+        {"ward": "Mathare / Eastleigh", "lat": -1.2686, "lon": 36.8536, "risk_mult": 1.2, "river": "Mathare River"},
+        {"ward": "Kibera / Woodley", "lat": -1.3138, "lon": 36.7845, "risk_mult": 1.3, "river": "Ngong River"},
+        {"ward": "Embakasi / Pipeline", "lat": -1.3032, "lon": 36.9081, "risk_mult": 1.1, "river": "Nairobi River Basin"},
+        {"ward": "Westlands / Parklands", "lat": -1.2683, "lon": 36.8115, "risk_mult": 0.6, "river": "Higher Elevation"},
+        {"ward": "CBD / Starehe", "lat": -1.2863, "lon": 36.8172, "risk_mult": 0.8, "river": "Nairobi River Basin"},
+        {"ward": "Kasarani / Mwiki", "lat": -1.2215, "lon": 36.8906, "risk_mult": 0.7, "river": "Gathara-ini River"},
+        {"ward": "Dagoretti / Riruta", "lat": -1.2989, "lon": 36.7538, "risk_mult": 0.5, "river": "Higher Elevation"}
+    ])
+
+    # 2. Get current risk level from latest forecast or default
+    current_prob = 0.05
+    if df_preds is not None and not df_preds.empty:
+        current_prob = df_preds['flood_probability'].iloc[0]
+
+    # 3. Dynamic Color Assignment Logic (RGB + Alpha)
+    def calculate_node_color(row):
+        adjusted_prob = min(current_prob * row['risk_mult'], 1.0)
+        if adjusted_prob >= 0.60:
+            return [220, 38, 38, 200]    # Red for High Risk
+        elif adjusted_prob >= 0.30:
+            return [217, 119, 6, 200]   # Orange for Moderate Risk
+        else:
+            return [16, 185, 129, 180]   # Green for Normal/Safe
+
+    ward_nodes['color'] = ward_nodes.apply(calculate_node_color)
+    ward_nodes['calculated_risk'] = ward_nodes['risk_mult'].apply(
+        lambda m: f"{min(current_prob * m * 100, 100):.1f}% Risk"
+    )
+
+    # 4. Interactive PyDeck Layer
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        ward_nodes,
+        get_position='[lon, lat]',
+        get_radius=1500,
+        get_fill_color='color',
+        get_line_color=[255, 255, 255],
+        line_width_min_pixels=2,
+        pickable=True
+    )
+
+    view_state = pdk.ViewState(latitude=-1.2850, longitude=36.8350, zoom=11.2, pitch=35)
     
-    if os.path.exists(geojson_path):
-        with open(geojson_path, "r") as f:
-            geojson_data = json.load(f)
-        layer = pdk.Layer(
-            "GeoJsonLayer", geojson_data, stroked=True, filled=True,
-            get_fill_color=[56, 189, 248, 100], get_line_color=[255, 255, 255, 200],
-            line_width_min_pixels=1, pickable=True
-        )
-    else:
-        # Fallback: Generate built-in Nairobi regional weather nodes if GeoJSON is missing
-        fallback_data = pd.DataFrame([
-            {"name": "Westlands / CBD", "lat": -1.2863, "lon": 36.8172, "risk": "Normal"},
-            {"name": "Kibera / Langata", "lat": -1.3138, "lon": 36.7845, "risk": "Moderate"},
-            {"name": "Mathare / Eastleigh", "lat": -1.2686, "lon": 36.8536, "risk": "Normal"},
-            {"name": "Embakasi", "lat": -1.3032, "lon": 36.9081, "risk": "Normal"},
-            {"name": "Kasarani", "lat": -1.2215, "lon": 36.8906, "risk": "Normal"}
-        ])
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            fallback_data,
-            get_position='[lon, lat]',
-            get_radius=1200,
-            get_fill_color=[56, 189, 248, 180],
-            get_line_color=[255, 255, 255],
-            line_width_min_pixels=2,
-            pickable=True
-        )
+    deck = pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={"html": "<b>Ward:</b> {ward}<br/><b>Drainage Basin:</b> {river}<br/><b>Status:</b> {calculated_risk}"}
+    )
 
-    view_state = pdk.ViewState(latitude=-1.2921, longitude=36.8219, zoom=11, pitch=25)
-    deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"html": "<b>Nairobi Monitoring Node</b>"})
     st.pydeck_chart(deck, use_container_width=True)
 
+    # Map Legend
+    st.markdown("""
+        <div style="display: flex; gap: 20px; justify-content: center; margin-top: 10px;">
+            <span style="color: #10b981;">● Normal / Safe Zone</span>
+            <span style="color: #d97706;">● Moderate Warning Zone</span>
+            <span style="color: #dc2626;">● High Risk Flood Zone</span>
+        </div>
+    """, unsafe_allow_html=True)
+
 # Footer
-st.markdown("---")
-st.markdown("Nairobi Meteorological & Flood Watch Hub")
+st.markdown("Nairobi Flood Monitoring & Risk Prediction System.")
