@@ -6,67 +6,79 @@ import os
 import json
 import pydeck as pdk
 
-# 1. Page Configuration & Layout
+# 1. Page Configuration
 st.set_page_config(
-    page_title="Nairobi Flood Intelligence System",
+    page_title="Nairobi Weather & Flood Watch",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. Professional Custom CSS (Clean dark theme, glassmorphism cards, no emojis)
+# 2. Weather App CSS Theme (Soft gradients, glassmorphism cards, modern aesthetic)
 st.markdown("""
     <style>
-    .main { background-color: #0b0f19; }
-    .stSidebar { background-color: #111827; }
+    .stApp { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #f8fafc; }
     
-    /* Custom Metric Cards */
-    .metric-container {
-        background-color: #1f2937;
-        border: 1px solid #374151;
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #090d16;
+        border-right: 1px solid #1e293b;
+    }
+
+    /* Main Weather Card Container */
+    .weather-card {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Weather State Banners */
+    .weather-safe {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: white;
         padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Risk Alert Banners */
-    .alert-high {
-        background-color: #991b1b;
-        color: #ffffff;
-        padding: 16px;
-        border-radius: 6px;
-        font-weight: 600;
+        border-radius: 15px;
         text-align: center;
-        letter-spacing: 0.5px;
-    }
-    .alert-mod {
-        background-color: #b45309;
-        color: #ffffff;
-        padding: 16px;
-        border-radius: 6px;
+        font-size: 1.2rem;
         font-weight: 600;
-        text-align: center;
-        letter-spacing: 0.5px;
+        box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.3);
     }
-    .alert-low {
-        background-color: #065f46;
-        color: #ffffff;
-        padding: 16px;
-        border-radius: 6px;
+    .weather-warning {
+        background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        font-size: 1.2rem;
         font-weight: 600;
-        text-align: center;
-        letter-spacing: 0.5px;
+        box-shadow: 0 10px 15px -3px rgba(217, 119, 6, 0.3);
     }
+    .weather-danger {
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        font-size: 1.2rem;
+        font-weight: 600;
+        box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
+    }
+
+    h1, h2, h3 { color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Header Title Section
-st.title("Nairobi Ward-Level Flood Risk Intelligence Hub")
-st.markdown("Operational decision-support dashboard driven by XGBoost machine learning, meteorological live feeds, and GIS ward boundary mappings.")
+# 3. Header Title
+st.title("Nairobi Atmospheric & Flood Watch")
+st.markdown("Live meteorological conditions and ward-level flood risk intelligence.")
 st.markdown("---")
 
-# 4. Safe Resource & Data Loading
+# 4. Load Model and Data Safely
 @st.cache_resource
-def load_ml_model():
+def load_model():
     if os.path.exists("flood_model.joblib"):
         return joblib.load("flood_model.joblib")
     return None
@@ -79,159 +91,157 @@ def load_predictions():
         return df
     return None
 
-model = load_ml_model()
+model = load_model()
 df_preds = load_predictions()
 
-# 5. Sidebar Control Panel with Weather-Themed Terminology
-st.sidebar.header("Operational Controls")
-st.sidebar.markdown("Configure analytical views and meteorological simulation parameters.")
+# 5. Sidebar Navigation Controls (Weather Station Style)
+st.sidebar.markdown("### Weather Station")
+st.sidebar.markdown("Select interaction mode:")
 
-app_mode = st.sidebar.selectbox(
-    "Select Operating Module",
-    ["Meteorological Forecast Feed", "Hydrological Simulation Lab", "Spatial Ward Risk Mapping"]
+app_mode = st.sidebar.radio(
+    "",
+    ["Live 7-Day Forecast", "Scenario Simulator", "Ward GIS Map"]
 )
 
 if model is None:
-    st.error("System Error: Model artifact 'flood_model.joblib' not detected. Please verify your working directory.")
+    st.error("Model file 'flood_model.joblib' missing.")
 
 
-# MODULE 1: METEOROLOGICAL FORECAST FEED (Rolling 7-Day Window)
+# MODE 1: LIVE FORECAST WEATHER CARDS
 
-if app_mode == "Meteorological Forecast Feed" and df_preds is not None:
-    st.subheader("Open-Meteo 7-Day Atmospheric & Precipitation Feed")
+if app_mode == "Live 7-Day Forecast" and df_preds is not None:
+    st.subheader("7-Day Forecast Outlook")
     
     min_date = df_preds['date'].min()
     max_date = df_preds['date'].max()
     
-    target_date = st.sidebar.date_input(
-        "Inspection Date",
+    selected_date = st.sidebar.date_input(
+        "Choose Forecast Date",
         value=min_date,
         min_value=min_date,
         max_value=max_date
     )
 
-    row_data = df_preds[df_preds['date'] == target_date]
+    row = df_preds[df_preds['date'] == selected_date]
 
-    if not row_data.empty:
-        record = row_data.iloc[0]
+    if not row.empty:
+        data = row.iloc[0]
+        prob = data['flood_probability']
         
-        # Metric columns layout
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Precipitation Rate", f"{record['rainfall_mm']:.1f} mm")
-        col2.metric("3-Day Cumulative", f"{record['rain_3day_sum']:.1f} mm")
-        col3.metric("Model Probability", f"{record['flood_probability'] * 100:.1f}%")
-        col4.metric("Risk Classification", record['risk_tier'])
+        # Determine weather visual state and face/status descriptor
+        if prob >= 0.70:
+            status_class = "weather-danger"
+            condition_text = "Severe Storm & Flood Warning"
+            face_icon = "(✖╭╮✖) High Risk Alert"
+        elif prob >= 0.40:
+            status_class = "weather-warning"
+            condition_text = "Heavy Showers / Elevated Risk"
+            face_icon = "(⊙_⊙) Moderate Advisory"
+        else:
+            status_class = "weather-safe"
+            condition_text = "Clear Skies / Stable Conditions"
+            face_icon = "(^◡^) Safe & Normal"
+
+        # Main Weather Dashboard Card Layout
+        st.markdown(f"""
+            <div class="weather-card">
+                <h2>{selected_date.strftime('%A, %B %d, %Y')}</h2>
+                <h1 style="font-size: 3rem; margin: 10px 0;">{face_icon}</h1>
+                <p style="font-size: 1.3rem; color: #cbd5e1;">Condition: <b>{condition_text}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Weather Metric Bubbles
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Rainfall Amount", f"{data['rainfall_mm']:.1f} mm")
+        c2.metric("3-Day Accumulation", f"{data['rain_3day_sum']:.1f} mm")
+        c3.metric("Flood Probability", f"{prob * 100:.1f}%")
+        c4.metric("Risk Status", data['risk_tier'])
 
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Status Alert Banner
-        if "HIGH" in record['risk_tier']:
-            st.markdown('<div class="alert-high">CRITICAL ALERT: High flood likelihood projected. Immediate drainage monitoring required in vulnerable sectors.</div>', unsafe_allow_html=True)
-        elif "MODERATE" in record['risk_tier']:
-            st.markdown('<div class="alert-mod">ADVISORY WARNING: Elevated moisture accumulation. Exercise vigilance near river basins.</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="alert-low">SYSTEM NORMAL: Atmospheric conditions stable. Nominal risk levels recorded.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="{status_class}">Operational Status: {data["risk_tier"]}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.subheader("Weekly Forecast Ledger")
+    st.subheader("Weekly Timeline Ledger")
     st.dataframe(df_preds[['date', 'rainfall_mm', 'rain_3day_sum', 'flood_probability', 'risk_tier']], use_container_width=True)
 
 
-# MODULE 2: HYDROLOGICAL SIMULATION LAB (What-If Custom Predictor)
+# MODE 2: SCENARIO SIMULATOR
 
-elif app_mode == "Hydrological Simulation Lab":
-    st.subheader("Custom What-If Precipitation Scenario Lab")
-    st.markdown("Bypass temporal API restrictions to simulate custom rainfall accumulation events across any timeline.")
+elif app_mode == "Scenario Simulator":
+    st.subheader("Custom Weather & Storm Simulator")
+    st.markdown("Test custom rainfall events to see how the system reacts under different weather scenarios.")
 
-    col_left, col_right = st.columns(2)
-    
-    with col_left:
-        sim_date = st.date_input("Simulation Target Date")
-        sim_rain = st.number_input("Daily Precipitation (mm)", min_value=0.0, max_value=250.0, value=30.0, step=1.0)
-        sim_3day = st.number_input("3-Day Cumulative Sum (mm)", min_value=0.0, max_value=500.0, value=75.0, step=1.0)
+    col1, col2 = st.columns(2)
+    with col1:
+        sim_date = st.date_input("Simulation Date")
+        rain_in = st.number_input("Daily Rainfall (mm)", 0.0, 200.0, 30.0)
+        rain_3 = st.number_input("3-Day Total (mm)", 0.0, 400.0, 75.0)
+    with col2:
+        rain_7 = st.number_input("7-Day Total (mm)", 0.0, 600.0, 120.0)
+        sim_month = sim_date.month
 
-    with col_right:
-        sim_7day = st.number_input("7-Day Cumulative Sum (mm)", min_value=0.0, max_value=800.0, value=120.0, step=1.0)
-        month_val = sim_date.month
-        anomaly_val = sim_rain - 10.0
-
-    if st.button("Execute Model Simulation", type="primary"):
-        input_vector = pd.DataFrame([{
-            'rainfall_mm': sim_rain,
-            'rain_3day_sum': sim_3day,
-            'rain_7day_sum': sim_7day,
-            'rain_anomaly': anomaly_val,
-            'month': month_val
+    if st.button("Run Simulation", type="primary"):
+        input_df = pd.DataFrame([{
+            'rainfall_mm': rain_in,
+            'rain_3day_sum': rain_3,
+            'rain_7day_sum': rain_7,
+            'rain_anomaly': rain_in - 5.0,
+            'month': sim_month
         }])
-
-        probability = model.predict_proba(input_vector)[0][1]
         
-        if probability >= 0.70:
-            classification = "HIGH RISK (Red Alert)"
-            box_style = "alert-high"
-        elif probability >= 0.40:
-            classification = "MODERATE RISK (Warning)"
-            box_style = "alert-mod"
+        prob = model.predict_proba(input_df)[0][1]
+        
+        if prob >= 0.70:
+            box_cls = "weather-danger"
+            sim_face = "(✖╭╮✖) Severe Storm Alert"
+        elif prob >= 0.40:
+            box_cls = "weather-warning"
+            sim_face = "(⊙_⊙) Moderate Weather Advisory"
         else:
-            classification = "LOW RISK (Normal)"
-            box_style = "alert-low"
+            box_cls = "weather-safe"
+            sim_face = "(^◡^) Clear & Stable"
 
-        st.markdown(f"### Simulation Outcome for: **{sim_date}**")
+        st.markdown(f"""
+            <div class="weather-card">
+                <h2>Simulation for {sim_date}</h2>
+                <h1 style="font-size: 3rem; margin: 10px 0;">{sim_face}</h1>
+                <p style="font-size: 1.2rem;">Calculated Flood Probability: <b>{prob * 100:.1f}%</b></p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        m_col1, m_col2, m_col3 = st.columns(3)
-        m_col1.metric("Input Rainfall", f"{sim_rain} mm")
-        m_col2.metric("Calculated Risk Score", f"{probability * 100:.1f}%")
-        m_col3.metric("Assigned Tier", classification)
-
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f'<div class="{box_style}">Simulation Result: {classification}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="{box_cls}">Simulation Outcome Score: {prob * 100:.1f}% Risk Probability</div>', unsafe_allow_html=True)
 
 
-# MODULE 3: SPATIAL WARD RISK MAPPING
+# MODE 3: WARD GIS MAP
 
-elif app_mode == "Spatial Ward Risk Mapping":
-    st.subheader("Nairobi Ward-Level GIS Infrastructure View")
-    st.markdown("Geospatial visualization framework rendering Nairobi's 85 administrative wards and river networks.")
-
+elif app_mode == "Ward GIS Map":
+    st.subheader("Nairobi County Ward Map")
     geojson_path = "nairobi_wards.geojson"
     
     if os.path.exists(geojson_path):
         with open(geojson_path, "r") as f:
             geojson_data = json.load(f)
             
-        # Center coordinates for Nairobi
-        nairobi_latitude = -1.2921
-        nairobi_longitude = 36.8219
-        
-        # Pydeck map layer configuration
         layer = pdk.Layer(
             "GeoJsonLayer",
             geojson_data,
             stroked=True,
             filled=True,
-            get_fill_color=[30, 58, 138, 140],
+            get_fill_color=[56, 189, 248, 100],
             get_line_color=[255, 255, 255, 200],
             line_width_min_pixels=1,
             pickable=True
         )
-
-        view_state = pdk.ViewState(
-            latitude=nairobi_latitude,
-            longitude=nairobi_longitude,
-            zoom=10.5,
-            pitch=30
-        )
-
-        r = pdk.Deck(
-            layers=[layer],
-            initial_view_state=view_state,
-            tooltip={"html": "<b>Ward Boundary Analysis</b>"}
-        )
-
-        st.pydeck_chart(r)
+        view_state = pdk.ViewState(latitude=-1.2921, longitude=36.8219, zoom=10.5, pitch=20)
+        deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"html": "<b>Ward Boundaries</b>"})
+        st.pydeck_chart(deck, use_container_width=True)
     else:
-        st.warning("Spatial layer file `nairobi_wards.geojson` not located in the project directory. Map rendering unavailable.")
+        st.warning("Spatial file `nairobi_wards.geojson` not found.")
 
-# Footer Section
+# Footer
 st.markdown("---")
-st.markdown("Academic Research Initiative | Advanced Spatial Flood Risk Prediction Engine")
+st.markdown("Nairobi Meteorological & Flood Watch Hub")
