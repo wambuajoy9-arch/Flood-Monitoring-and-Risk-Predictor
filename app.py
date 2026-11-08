@@ -204,7 +204,7 @@ elif app_mode == "Ward GIS Map":
     if df_preds is not None and not df_preds.empty:
         current_prob = df_preds['flood_probability'].iloc[0]
 
-    # 3. Dynamic Color Assignment Logic (RGB + Alpha)
+    # 3. Dynamic Color Assignment Logic (RGB + Alpha) with axis=1 safety fix
     def calculate_node_color(row):
         adjusted_prob = min(current_prob * row['risk_mult'], 1.0)
         if adjusted_prob >= 0.60:
@@ -214,7 +214,7 @@ elif app_mode == "Ward GIS Map":
         else:
             return [16, 185, 129, 180]   # Green for Normal/Safe
 
-    ward_nodes['color'] = ward_nodes.apply(calculate_node_color)
+    ward_nodes['color'] = ward_nodes.apply(calculate_node_color, axis=1)
     ward_nodes['calculated_risk'] = ward_nodes['risk_mult'].apply(
         lambda m: f"{min(current_prob * m * 100, 100):.1f}% Risk"
     )
